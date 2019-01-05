@@ -1,0 +1,101 @@
+---
+title: "PeerReview8"
+author: "Lodewijk Wennemers"
+date: "2019 M01 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Peer review project: practical machine learning
+## By Lodewijk Wennemers
+
+###Getting the data & loading the packages
+```{r message=FALSE}
+#load the required packages
+library(caret)
+library(randomForest)
+library(dplyr)
+library(rpart)
+
+set.seed(123)
+
+
+#data is loaded with read.csv into training and testing variables
+if(!(exists("training"))){
+training<-read.csv('C:/Users/lodew/Google Drive/Random/R-Projects/Coursera-datascience-8/pml-training.csv')
+testing<-read.csv('C:/Users/lodew/Google Drive/Random/R-Projects/Coursera-datascience-8/pml-testing.csv')
+}
+```
+
+###Analyse & Clean the data
+```{r}
+#First look at the data // commented for a compact report
+#str(training)
+#some columns seem to have NA values
+NAtest<-apply(training,2,anyNA)
+sum(NAtest)
+
+#lets's now remove the columns with NA
+percNA<-as.data.frame(colMeans(is.na(training)))
+NACols<- which((apply(training,2,anyNA)))
+
+training<-training[,-NACols]
+testing<-testing[,-NACols]
+
+#remove variables with almost no variance
+LowVarCols<-nearZeroVar(training)
+training<-training[,-LowVarCols]
+testing<-testing[,-LowVarCols] 
+
+#remove cols that are useless 
+training<-training[,-c(1:5)]
+testing<-testing[,-c(1:5)]
+
+```
+
+###Create a seperate testing set
+```{r}
+#create a seperate testing partition
+intrain1 <- createDataPartition(training$classe, p=0.75, list=FALSE)
+training1<-training[intrain1,]
+testing1<-training[-intrain1,]
+
+```
+
+###Random Forest model
+```{r}
+# train the model Randomforest
+modelRF <- randomForest(as.factor(classe)~.,data=training1)
+PredRF<-predict(modelRF,testing1)
+
+#We now see that accuracy is 0.9969
+confusionMatrix(testing1$classe,PredRF)
+
+#scores 100% on the quiz
+PredTest<-predict(modelRF,testing)
+```
+
+
+###Rpart model
+```{r}
+# train the rpart model
+modelDt<-rpart(as.factor(classe)~.,data=training)
+modelDt<-train(as.factor(classe)~.,data=training1,method="rpart")
+predDt<-predict(modelDt,testing1)
+confusionMatrix(predDt,testing1$classe)
+```
+
+###RandomForest model with cross validation
+```{r}
+train_control <- trainControl(method="cv", number=10)
+modelRF2<-train(as.factor(classe)~.,data=training1,method="rf",trControl=train_control)
+predRF2<-predict(modelRF2,testing1)
+confusionMatrix(predRF2,testing1$classe)
+PredTest2<-predict(modelRF2,testing)
+PredTest==PredTest2
+```
+###Conclusion
+The randomforest model is extremely much better than the rpart model, but there is no big improvement when cross validating 10 times. both models 
